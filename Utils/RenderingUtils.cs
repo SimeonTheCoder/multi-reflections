@@ -1,4 +1,5 @@
 using System.Numerics;
+using Graphs;
 using Raylib_cs;
 
 namespace Utils;
@@ -72,11 +73,11 @@ public class RenderingUtils
 
     public static void DrawLinks(Graph graph, int selectedEdge)
     {
-        for (int i = 0; i < graph.links.Count; i++)
+        for (int i = 0; i < graph.edges.Count; i++)
         {
             Line(
-                MathUtils.RotateVec(graph.nodes[graph.links[i].from], Theta, DoRotation),
-                MathUtils.RotateVec(graph.nodes[graph.links[i].to], Theta, DoRotation),
+                MathUtils.RotateVec(graph.nodes[graph.edges[i].from], Theta, DoRotation),
+                MathUtils.RotateVec(graph.nodes[graph.edges[i].to], Theta, DoRotation),
                 i == selectedEdge ? Color.Yellow : Color.White
             );
         }

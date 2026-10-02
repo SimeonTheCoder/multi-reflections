@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Graphs;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -11,38 +12,14 @@ public class Program
     static int Steps = 720;
     static float RenderSize = 0.1f;
     static bool DoRotation = false;
-    static int Count = 8;
+    static int Count = 16;
 
     static Vector2 MicPos = new(0f, 0f);
 
-    static Vector2 TransformNodesMic(Vector2 mic, Graph graph, List<int> transforms, int count)
-    {
-        Vector2 copy = mic;
-        Graph graphCopy = graph;
-
-        for (int i = 0; i < count; i++)
-        {
-            graphCopy = GraphUtils.MirrorGraphAlongAxis(graphCopy, transforms[i]);
-            copy = GraphUtils.MirrorNodeAlongAxis(graphCopy, copy, transforms[i]);
-        }
-
-        return copy;
-    }
-
     static void Main(string[] args)
     {
-        Color[] colors =
-        [
-            Color.Red,
-            Color.Green,
-            Color.Blue,
-            Color.Yellow,
-            Color.Pink,
-            Color.Brown,
-        ];
-
         bool placementMode = false;
-        List<int> selectedEdges = new();
+        GraphPath selectedPath = new();
 
         InitWindow(1920, 1080, "Test");
         SetTargetFPS(120);
@@ -51,12 +28,10 @@ public class Program
 
         Graph graph = new();
 
-        List<(int path, float start, float end)> data = new();
-
         while (!WindowShouldClose())
         {
             if (!placementMode && graph.nodes.Count > 0)
-                selectedEdges = GraphUtils.GeneratePath(graph, Count, Theta);
+                selectedPath = Graph.GeneratePath(graph, Count, Theta);
 
             Zoom *= 1 + 0.1f * GetMouseWheelMoveV().Y;
 
@@ -83,7 +58,7 @@ public class Program
                 }
 
                 if (graph.nodes.Count > 0)
-                    graph.links.Add(
+                    graph.edges.Add(
                         (graph.nodes.Count - 1, (snapNode != -1) ? snapNode : graph.nodes.Count)
                     );
                 if (snapNode == -1)
@@ -96,58 +71,21 @@ public class Program
 
             if (!placementMode && graph.nodes.Count > 0)
             {
-                data.Clear();
-
-                int lastPath = 0;
-                float start = 0;
-
-                for (int i = 0; i < Steps; i++)
-                {
-                    float theta = 360f / Steps * i + 90;
-                    if (theta > 360f)
-                        theta -= 360f;
-
-                    List<int> steps = GraphUtils.GeneratePath(graph, Count, theta);
-
-                    int path = DataUtils.PackPath(steps);
-
-                    if (path != lastPath)
-                    {
-                        data.Add((path, start, (360f / Steps * (i - 1) + 90f) % 360f));
-                        start = theta;
-                    }
-
-                    lastPath = path;
-
-                    for (int j = 0; j < Count; j++)
-                    {
-                        Vector2 xy = new(i / (float)Steps - 0.5f, j / (float)Count - 0.5f);
-                        Rect(xy * 10f, new Vector2(1f / Steps, 1f / Count) * 10, colors[steps[j]]);
-                    }
-
-                    if (i == Steps - 1)
-                    {
-                        data.Add((path, start, 90f));
-                    }
-                }
-
+                graph.GenerateData(Steps, Count);
                 int validCount = 0;
 
-                for (int i = 0; i < data.Count; i++)
+                for (int i = 0; i < graph.data.Count; i++)
                 {
                     for (int k = 0; k < Count; k++)
                     {
-                        Vector2 newMic = TransformNodesMic(
+                        bool valid = graph.IsValidPath(i, MicPos, k);
+
+                        Vector2 newMic = graph.TransformNodeWithGraph(
                             MicPos,
-                            graph,
-                            DataUtils.UnpackPath(data[i].path),
+                            graph.data[i],
                             k
                         );
-                        float angle = MathF.Atan2(newMic.X, newMic.Y) / MathF.PI * 180f;
-                        if (angle < 0f)
-                            angle = angle + 360f;
 
-                        bool valid = angle >= data[i].start && angle <= data[i].end;
                         if (valid)
                         {
                             validCount++;
@@ -156,20 +94,20 @@ public class Program
                     }
                 }
 
-                System.Console.WriteLine($"Valid: {(validCount / (float)data.Count * 100):f2}%");
+                System.Console.WriteLine($"Valid: {(validCount / (float) graph.data.Count * 100):f2}%");
             }
 
-            DrawGraph(graph, selectedEdges.Count > 0 ? selectedEdges[selectedEdges.Count - 1] : -1);
+            DrawGraph(graph, selectedPath.Length > 0 ? selectedPath.edges[selectedPath.Length - 1] : -1);
 
-            if (selectedEdges.Count > 0)
+            if (selectedPath.Length > 0)
             {
-                for (int i = 0; i < selectedEdges.Count; i++)
+                for (int i = 0; i < selectedPath.Length; i++)
                 {
-                    DrawGraph(graph, selectedEdges[i]);
+                    DrawGraph(graph, selectedPath.edges[i]);
 
                     Rect(
                         MathUtils.RotateVec(
-                            TransformNodesMic(MicPos, graph, selectedEdges, i + 1),
+                            graph.TransformNodeWithGraph(MicPos, selectedPath, i + 1),
                             Theta,
                             DoRotation
                         ),
@@ -203,15 +141,15 @@ public class Program
             ImGui.SliderFloat("Theta", ref Theta, 0f, 360f);
             ImGui.SliderInt("Step Size", ref Steps, 0, 360_0);
             ImGui.SliderFloat("Render Size", ref RenderSize, 0f, 0.2f);
-            // ImGui.SliderInt("Count", ref Count, 0, 100);
+            ImGui.SliderInt("Count", ref Count, 0, 100);
             ImGui.Checkbox("Point up", ref DoRotation);
 
             ImGui.BeginMultiSelect(ImGuiMultiSelectFlags.SingleSelect);
 
-            for (int i = 0; i < graph.links.Count; i++)
+            for (int i = 0; i < graph.edges.Count; i++)
             {
-                if (ImGui.Selectable($"{i}: {graph.links[i].from} --> {graph.links[i].to}"))
-                    selectedEdges.Add(i);
+                if (ImGui.Selectable($"{i}: {graph.edges[i].from} --> {graph.edges[i].to}"))
+                    selectedPath.edges.Add(i);
             }
 
             ImGui.EndMultiSelect();

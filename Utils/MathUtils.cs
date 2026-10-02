@@ -1,5 +1,7 @@
 using System.Numerics;
 
+namespace Utils;
+
 public class MathUtils
 {
     public static Vector2 TransformVec(Vector2 vec, Vector2 i, Vector2 j)
