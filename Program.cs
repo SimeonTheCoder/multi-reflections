@@ -8,7 +8,6 @@ using static Utils.RenderingUtils;
 
 public class Program
 {
-    static float Theta = 0f;
     static int Steps = 720;
     static float RenderSize = 0.1f;
     static bool DoRotation = false;
@@ -16,270 +15,18 @@ public class Program
 
     static Vector2 MicPos = new(0f, 0f);
 
-    static Vector2 TransformVec(Vector2 vector, Vector2 i, Vector2 j)
-    {
-        return vector.X * i + vector.Y * j;
-    }
-
-    static Vector2 RotateVec(Vector2 vec, bool should = true)
-    {
-        if (!should)
-            return vec;
-        return TransformVec(
-            vec,
-            new(MathF.Cos(Theta / 180f * MathF.PI), MathF.Sin(Theta / 180f * MathF.PI)),
-            new(-MathF.Sin(Theta / 180f * MathF.PI), MathF.Cos(Theta / 180f * MathF.PI))
-        );
-    }
-
-    static Vector2 RotateVec(Vector2 vec, float theta, bool should = true)
-    {
-        if (!should)
-            return vec;
-        return TransformVec(
-            vec,
-            new(MathF.Cos(theta / 180f * MathF.PI), MathF.Sin(theta / 180f * MathF.PI)),
-            new(-MathF.Sin(theta / 180f * MathF.PI), MathF.Cos(theta / 180f * MathF.PI))
-        );
-    }
-
-    static Vector2 DoAxisFlip(Vector2 vector, float theta, float xo, float yo)
-    {
-        float thetaRad = theta / 180f * MathF.PI;
-        Vector2 copy = new(vector.X, vector.Y);
-
-        copy -= new Vector2(xo, yo);
-        copy = TransformVec(
-            copy,
-            new(MathF.Cos(-thetaRad), MathF.Sin(-thetaRad)),
-            new(-MathF.Sin(-thetaRad), MathF.Cos(-thetaRad))
-        );
-
-        copy = TransformVec(copy, new(1f, 0f), new(0f, -1f));
-
-        copy = TransformVec(
-            copy,
-            new(MathF.Cos(thetaRad), MathF.Sin(thetaRad)),
-            new(-MathF.Sin(thetaRad), MathF.Cos(thetaRad))
-        );
-        copy += new Vector2(xo, yo);
-
-        return copy;
-    }
-
-    static void DrawNodes(List<Vector2> nodes)
-    {
-        for (int i = 0; i < nodes.Count; i++)
-        {
-            Rect(RotateVec(nodes[i], DoRotation), new(0.1f, 0.1f), Color.White);
-
-            (int x, int y) coords = TransformCoords(RotateVec(nodes[i], DoRotation));
-            DrawText($"{i}", coords.x - 10, coords.y - 20, 10, Color.Yellow);
-        }
-    }
-
-    static void DrawLinks(
-        List<(int from, int to)> links,
-        List<Vector2> nodes,
-        int selectedEdge,
-        int lastCollision
-    )
-    {
-        for (int i = 0; i < links.Count; i++)
-        {
-            Line(
-                RotateVec(nodes[links[i].from], DoRotation),
-                RotateVec(nodes[links[i].to], DoRotation),
-                i == selectedEdge ? Color.Yellow : Color.White
-            );
-        }
-
-        // int collisionEdge = GetCollisionEdge(nodes, links, lastCollision);
-        // if (collisionEdge == -1) return;
-
-        // Line(
-        //     RotateVec(nodes[links[collisionEdge].from], DoRotation),
-        //     RotateVec(nodes[links[collisionEdge].to], DoRotation),
-        //     Color.Red
-        // );
-    }
-
-    static Vector2 MirrorNodeAlongAxis(
-        List<(int from, int to)> links,
-        List<Vector2> nodes,
-        Vector2 node,
-        int selectedEdge
-    )
-    {
-        if (selectedEdge == -1)
-            return node;
-
-        Vector2 edgeStart = nodes[links[selectedEdge].from];
-        Vector2 edgeEnd = nodes[links[selectedEdge].to];
-
-        float dx = edgeEnd.X - edgeStart.X;
-        float dy = edgeEnd.Y - edgeStart.Y;
-
-        float theta = MathF.Atan2(dy, dx);
-
-        float xo = edgeStart.X;
-        float yo = edgeStart.Y;
-
-        return DoAxisFlip(node, theta * 180 / MathF.PI, xo, yo);
-    }
-
-    static List<Vector2> MirrorGraphAlongAxis(
-        List<(int from, int to)> links,
-        List<Vector2> nodes,
-        int selectedEdge
-    )
-    {
-        if (selectedEdge == -1)
-            return nodes;
-
-        Vector2 edgeStart = nodes[links[selectedEdge].from];
-        Vector2 edgeEnd = nodes[links[selectedEdge].to];
-
-        float dx = edgeEnd.X - edgeStart.X;
-        float dy = edgeEnd.Y - edgeStart.Y;
-
-        float theta = MathF.Atan2(dy, dx);
-
-        float xo = edgeStart.X;
-        float yo = edgeStart.Y;
-
-        return nodes.Select(n => DoAxisFlip(n, theta * 180 / MathF.PI, xo, yo)).ToList();
-    }
-
-    static List<Vector2> TransformNodes(
-        List<Vector2> nodes,
-        List<(int from, int to)> links,
-        List<int> transforms,
-        int count
-    )
-    {
-        List<Vector2> copy = nodes;
-
-        for (int i = 0; i < count; i++)
-            copy = MirrorGraphAlongAxis(links, copy, transforms[i]);
-
-        return copy;
-    }
-
-    static Vector2 TransformNodesMic(
-        Vector2 mic,
-        List<Vector2> nodes,
-        List<(int from, int to)> links,
-        List<int> transforms,
-        int count
-    )
+    static Vector2 TransformNodesMic(Vector2 mic, Graph graph, List<int> transforms, int count)
     {
         Vector2 copy = mic;
-        List<Vector2> graphCopy = nodes;
+        Graph graphCopy = graph;
 
         for (int i = 0; i < count; i++)
         {
-            graphCopy = MirrorGraphAlongAxis(links, graphCopy, transforms[i]);
-            copy = MirrorNodeAlongAxis(links, graphCopy, copy, transforms[i]);
+            graphCopy = GraphUtils.MirrorGraphAlongAxis(graphCopy, transforms[i]);
+            copy = GraphUtils.MirrorNodeAlongAxis(graphCopy, copy, transforms[i]);
         }
 
         return copy;
-    }
-
-    static int GetCollisionEdge(
-        List<Vector2> nodes,
-        List<(int from, int to)> links,
-        float theta,
-        int lastLink
-    )
-    {
-        int collisionEdge = -1;
-        float lastY = -999;
-
-        for (int i = 0; i < links.Count; i++)
-        {
-            Vector2 a = RotateVec(nodes[links[i].from], theta);
-            Vector2 b = RotateVec(nodes[links[i].to], theta);
-
-            if (b.X < a.X)
-            {
-                Vector2 temp = new(a.X, a.Y);
-
-                a.X = b.X;
-                a.Y = b.Y;
-
-                b.X = temp.X;
-                b.Y = temp.Y;
-            }
-
-            if (i != lastLink && a.X <= 0 && b.X >= 0)
-            {
-                float t = (0f - a.X) / (b.X - a.X);
-                float y = (1 - t) * a.Y + t * b.Y;
-
-                if (y > lastY)
-                {
-                    collisionEdge = i;
-                    lastY = y;
-                }
-            }
-        }
-
-        return collisionEdge;
-    }
-
-    static List<int> SelectEdges(
-        List<Vector2> nodes,
-        List<(int from, int to)> links,
-        int count,
-        float theta
-    )
-    {
-        List<Vector2> currNodes = nodes;
-        List<int> edges = [GetCollisionEdge(currNodes, links, theta, -1)];
-
-        for (int i = 0; i < count - 1; i++)
-        {
-            currNodes = MirrorGraphAlongAxis(links, currNodes, edges[i]);
-            edges.Add(GetCollisionEdge(currNodes, links, theta, edges.Count > 0 ? edges[i] : -1));
-
-            if (edges[edges.Count - 1] == -1)
-            {
-                System.Console.WriteLine("ERR");
-                GetCollisionEdge(currNodes, links, theta, edges[edges.Count - 2]);
-            }
-        }
-
-        return edges;
-    }
-
-    static int PackPath(List<int> edges)
-    {
-        int result = 0;
-
-        for (int i = 0; i < 8; i++)
-        {
-            int curr = i < edges.Count ? edges[i] : 0xF;
-            result += curr << (4 * (7 - i));
-        }
-
-        return result;
-    }
-
-    static List<int> UnpackPath(int path)
-    {
-        List<int> edges = new();
-
-        for (int i = 0; i < 8; i++)
-        {
-            int curr = (path >> (4 * (7 - i))) & 0xF;
-            if (curr == 0xF)
-                break;
-
-            edges.Add(curr);
-        }
-
-        return edges;
     }
 
     static void Main(string[] args)
@@ -302,15 +49,14 @@ public class Program
 
         rlImGui.Setup(true);
 
-        List<Vector2> nodes = new();
-        List<(int from, int to)> links = new();
+        Graph graph = new();
 
         List<(int path, float start, float end)> data = new();
 
         while (!WindowShouldClose())
         {
-            if (!placementMode && nodes.Count > 0)
-                selectedEdges = SelectEdges(nodes, links, Count, Theta);
+            if (!placementMode && graph.nodes.Count > 0)
+                selectedEdges = GraphUtils.GeneratePath(graph, Count, Theta);
 
             Zoom *= 1 + 0.1f * GetMouseWheelMoveV().Y;
 
@@ -327,26 +73,28 @@ public class Program
             {
                 int snapNode = -1;
 
-                for (int i = 0; i < nodes.Count; i++)
+                for (int i = 0; i < graph.nodes.Count; i++)
                 {
-                    if (Vector2.Distance(nodes[i], mousePos) >= 0.1f)
+                    if (Vector2.Distance(graph.nodes[i], mousePos) >= 0.1f)
                         continue;
 
                     snapNode = i;
                     break;
                 }
 
-                if (nodes.Count > 0)
-                    links.Add((nodes.Count - 1, (snapNode != -1) ? snapNode : nodes.Count));
+                if (graph.nodes.Count > 0)
+                    graph.links.Add(
+                        (graph.nodes.Count - 1, (snapNode != -1) ? snapNode : graph.nodes.Count)
+                    );
                 if (snapNode == -1)
-                    nodes.Add(mousePos);
+                    graph.nodes.Add(mousePos);
             }
 
             BeginDrawing();
 
             ClearBackground(Color.Black);
 
-            if (!placementMode && nodes.Count > 0)
+            if (!placementMode && graph.nodes.Count > 0)
             {
                 data.Clear();
 
@@ -359,9 +107,9 @@ public class Program
                     if (theta > 360f)
                         theta -= 360f;
 
-                    List<int> steps = SelectEdges(nodes, links, Count, theta);
+                    List<int> steps = GraphUtils.GeneratePath(graph, Count, theta);
 
-                    int path = PackPath(steps);
+                    int path = DataUtils.PackPath(steps);
 
                     if (path != lastPath)
                     {
@@ -391,9 +139,8 @@ public class Program
                     {
                         Vector2 newMic = TransformNodesMic(
                             MicPos,
-                            nodes,
-                            links,
-                            UnpackPath(data[i].path),
+                            graph,
+                            DataUtils.UnpackPath(data[i].path),
                             k
                         );
                         float angle = MathF.Atan2(newMic.X, newMic.Y) / MathF.PI * 180f;
@@ -412,28 +159,18 @@ public class Program
                 System.Console.WriteLine($"Valid: {(validCount / (float)data.Count * 100):f2}%");
             }
 
-            DrawNodes(nodes);
-            DrawLinks(
-                links,
-                nodes,
-                -1,
-                selectedEdges.Count > 0 ? selectedEdges[selectedEdges.Count - 1] : -1
-            );
+            DrawGraph(graph, selectedEdges.Count > 0 ? selectedEdges[selectedEdges.Count - 1] : -1);
 
             if (selectedEdges.Count > 0)
             {
                 for (int i = 0; i < selectedEdges.Count; i++)
                 {
-                    DrawNodes(TransformNodes(nodes, links, selectedEdges, i + 1));
-                    DrawLinks(
-                        links,
-                        TransformNodes(nodes, links, selectedEdges, i + 1),
-                        selectedEdges[i],
-                        selectedEdges[i]
-                    );
+                    DrawGraph(graph, selectedEdges[i]);
+
                     Rect(
-                        RotateVec(
-                            TransformNodesMic(MicPos, nodes, links, selectedEdges, i + 1),
+                        MathUtils.RotateVec(
+                            TransformNodesMic(MicPos, graph, selectedEdges, i + 1),
+                            Theta,
                             DoRotation
                         ),
                         new(0.2f, 0.2f),
@@ -442,10 +179,10 @@ public class Program
                 }
             }
 
-            if (placementMode && nodes.Count > 0)
-                Line(nodes[nodes.Count - 1], mousePos, Color.Yellow);
+            if (placementMode && graph.nodes.Count > 0)
+                Line(graph.nodes[graph.nodes.Count - 1], mousePos, Color.Yellow);
 
-            foreach (Vector2 node in nodes)
+            foreach (Vector2 node in graph.nodes)
             {
                 if (Vector2.Distance(node, mousePos) < 0.1f)
                     Rect(node, new(0.2f, 0.2f), Color.Green);
@@ -454,8 +191,8 @@ public class Program
             Rect(MicPos, new(0.2f, 0.2f), Color.Red);
 
             Line(
-                RotateVec(new(0, -100), -Theta, !DoRotation),
-                RotateVec(new(0, 100), -Theta, !DoRotation),
+                MathUtils.RotateVec(new(0, -100), -Theta, !DoRotation),
+                MathUtils.RotateVec(new(0, 100), -Theta, !DoRotation),
                 Color.Green
             );
 
@@ -471,9 +208,9 @@ public class Program
 
             ImGui.BeginMultiSelect(ImGuiMultiSelectFlags.SingleSelect);
 
-            for (int i = 0; i < links.Count; i++)
+            for (int i = 0; i < graph.links.Count; i++)
             {
-                if (ImGui.Selectable($"{i}: {links[i].from} --> {links[i].to}"))
+                if (ImGui.Selectable($"{i}: {graph.links[i].from} --> {graph.links[i].to}"))
                     selectedEdges.Add(i);
             }
 

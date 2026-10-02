@@ -6,12 +6,15 @@ namespace Utils;
 public class RenderingUtils
 {
     public static float Zoom = 100f;
+    public static bool DoRotation = false;
+    public static float Theta = 0f;
 
     public static (int x, int y) TransformCoords(Vector2 coords)
     {
         return (
-            (int) ((coords.X - 0.5f) * Zoom + Raylib.GetScreenWidth() / 2),
-            Raylib.GetScreenHeight() - (int) ((coords.Y - 0.5f) * Zoom + Raylib.GetScreenHeight() / 2)
+            (int)((coords.X - 0.5f) * Zoom + Raylib.GetScreenWidth() / 2),
+            Raylib.GetScreenHeight()
+                - (int)((coords.Y - 0.5f) * Zoom + Raylib.GetScreenHeight() / 2)
         );
     }
 
@@ -34,13 +37,48 @@ public class RenderingUtils
     public static void Rect(Vector2 center, Vector2 size, Color color)
     {
         (int x, int y) = TransformCoords(center);
-        
+
         Raylib.DrawRectangle(
-            x - (int) (size.X / 2 * Zoom),
-            y - (int) (size.Y / 2 * Zoom),
-            (int) (size.X * Zoom),
-            (int) (size.Y * Zoom),
+            x - (int)(size.X / 2 * Zoom),
+            y - (int)(size.Y / 2 * Zoom),
+            (int)(size.X * Zoom),
+            (int)(size.Y * Zoom),
             color
         );
+    }
+
+    public static void DrawGraph(Graph graph, int selectedEdge)
+    {
+        DrawLinks(graph, selectedEdge);
+        DrawNodes(graph);
+    }
+
+    public static void DrawNodes(Graph graph)
+    {
+        for (int i = 0; i < graph.nodes.Count; i++)
+        {
+            Rect(
+                MathUtils.RotateVec(graph.nodes[i], Theta, DoRotation),
+                new(0.1f, 0.1f),
+                Color.White
+            );
+
+            (int x, int y) coords = TransformCoords(
+                MathUtils.RotateVec(graph.nodes[i], Theta, DoRotation)
+            );
+            Raylib.DrawText($"{i}", coords.x - 10, coords.y - 20, 10, Color.Yellow);
+        }
+    }
+
+    public static void DrawLinks(Graph graph, int selectedEdge)
+    {
+        for (int i = 0; i < graph.links.Count; i++)
+        {
+            Line(
+                MathUtils.RotateVec(graph.nodes[graph.links[i].from], Theta, DoRotation),
+                MathUtils.RotateVec(graph.nodes[graph.links[i].to], Theta, DoRotation),
+                i == selectedEdge ? Color.Yellow : Color.White
+            );
+        }
     }
 }
