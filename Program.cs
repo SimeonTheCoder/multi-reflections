@@ -245,7 +245,7 @@ public class Program
 
             if (edges[edges.Count - 1] == -1)
             {
-                System.Console.WriteLine();
+                System.Console.WriteLine("ERR");
                 GetCollisionEdge(currNodes, links, theta, edges[edges.Count - 2]);
             }
         }
@@ -258,7 +258,10 @@ public class Program
         int result = 0;
 
         for (int i = 0; i < 8; i++)
-            result += edges[i] << (4 * i);
+        {
+            int curr = i < edges.Count ? edges[i] : 0xF;
+            result += curr << (4 * (7 - i));
+        }
 
         return result;
     }
@@ -268,7 +271,13 @@ public class Program
         List<int> edges = new();
 
         for (int i = 0; i < 8; i++)
-            edges.Add((path >> (4 * i)) & 0xF);
+        {
+            int curr = (path >> (4 * (7 - i))) & 0xF;
+            if (curr == 0xF)
+                break;
+
+            edges.Add(curr);
+        }
 
         return edges;
     }
@@ -378,25 +387,26 @@ public class Program
 
                 for (int i = 0; i < data.Count; i++)
                 {
-                    Vector2 newMic = TransformNodesMic(
-                        MicPos,
-                        nodes,
-                        links,
-                        UnpackPath(data[i].path),
-                        8
-                    );
-                    System.Console.WriteLine($"newMic: ({newMic.X}, {newMic.Y})");
-                    float angle = MathF.Atan2(newMic.X, newMic.Y) / MathF.PI * 180f;
-                    if (angle < 0f)
-                        angle = angle + 360f;
+                    for (int k = 0; k < Count; k++)
+                    {
+                        Vector2 newMic = TransformNodesMic(
+                            MicPos,
+                            nodes,
+                            links,
+                            UnpackPath(data[i].path),
+                            k
+                        );
+                        float angle = MathF.Atan2(newMic.X, newMic.Y) / MathF.PI * 180f;
+                        if (angle < 0f)
+                            angle = angle + 360f;
 
-                    Console.WriteLine(
-                        $"i: {i}, Mic angle: {angle}, data angle: {data[i].start} to {data[i].end}"
-                    );
-
-                    bool valid = angle >= data[i].start && angle <= data[i].end;
-                    if (valid)
-                        validCount++;
+                        bool valid = angle >= data[i].start && angle <= data[i].end;
+                        if (valid)
+                        {
+                            validCount++;
+                            Line(newMic, new(0, 0), Color.Red);
+                        }
+                    }
                 }
 
                 System.Console.WriteLine($"Valid: {(validCount / (float)data.Count * 100):f2}%");
@@ -464,17 +474,8 @@ public class Program
             for (int i = 0; i < links.Count; i++)
             {
                 if (ImGui.Selectable($"{i}: {links[i].from} --> {links[i].to}"))
-                {
                     selectedEdges.Add(i);
-                }
             }
-
-            // if (!placementMode && nodes.Count > 0 && selectedEdges.Count > 0)
-            // {
-            //     System.Console.WriteLine("Edges: " + string.Join(", ", selectedEdges));
-            //     System.Console.WriteLine(PackPath(selectedEdges));
-            //     System.Console.WriteLine("Unpacked: " + string.Join(", ", UnpackPath(PackPath(selectedEdges))));
-            // }
 
             ImGui.EndMultiSelect();
 
